@@ -10,7 +10,7 @@
    2. Groups tabs by domain with a landing pages category
    3. Renders domain cards, banners, and stats
    4. Handles all user actions (close tabs, save for later, focus tab)
-   5. Stores "Saved for Later" tabs in chrome.storage.local (no server)
+   5. Stores saved tabs in chrome.storage.local (no server)
    ================================================================ */
 
 'use strict';
@@ -222,7 +222,7 @@ async function closeTabOutDupes() {
 /**
  * saveTabForLater(tab)
  *
- * Saves a single tab to the "Saved for Later" list in chrome.storage.local.
+ * Saves a single tab to chrome.storage.local.
  * @param {{ url: string, title: string }} tab
  */
 async function saveTabForLater(tab) {
@@ -526,6 +526,11 @@ const FRIENDLY_DOMAINS = {
   'youtube.com':          'YouTube',
   'www.youtube.com':      'YouTube',
   'music.youtube.com':    'YouTube Music',
+  'tiktok.com':           'TikTok',
+  'www.tiktok.com':       'TikTok',
+  'mp.weixin.qq.com':     'WeChat',
+  'weixin.qq.com':        'WeChat',
+  'www.weixin.qq.com':    'WeChat',
   'x.com':                'X',
   'www.x.com':            'X',
   'twitter.com':          'X',
@@ -772,7 +777,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${label}</span>${dupeTag}
       <div class="chip-actions">
-        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save tab">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
         <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="Close this tab">
@@ -853,7 +858,7 @@ function renderDomainCard(group) {
       ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
       <span class="chip-text">${label}</span>${dupeTag}
       <div class="chip-actions">
-        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
+        <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save tab">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
         </button>
         <button class="chip-action chip-close" data-action="close-single-tab" data-tab-url="${safeUrl}" title="Close this tab">
@@ -898,18 +903,17 @@ function renderDomainCard(group) {
 
 
 /* ----------------------------------------------------------------
-   SAVED FOR LATER — Render Checklist Column
+   SAVED TABS — Render Grouped Main Section
    ---------------------------------------------------------------- */
 
 /**
- * renderDeferredColumn()
+ * renderSavedTabsSection()
  *
- * Reads saved tabs from chrome.storage.local and renders the right-side
- * "Saved for Later" checklist column. Shows active items as a checklist
- * and completed items in a collapsible archive.
+ * Reads saved tabs from chrome.storage.local and renders active items
+ * as source-grouped cards in the main area.
  */
-async function renderDeferredColumn() {
-  const column         = document.getElementById('deferredColumn');
+async function renderSavedTabsSection() {
+  const section        = document.getElementById('savedTabsSection');
   const list           = document.getElementById('deferredList');
   const empty          = document.getElementById('deferredEmpty');
   const countEl        = document.getElementById('deferredCount');
@@ -917,23 +921,17 @@ async function renderDeferredColumn() {
   const archiveCountEl = document.getElementById('archiveCount');
   const archiveList    = document.getElementById('archiveList');
 
-  if (!column) return;
+  if (!section) return;
 
   try {
     const { active, archived } = await getSavedTabs();
 
-    // Hide the entire column if there's nothing to show
-    if (active.length === 0 && archived.length === 0) {
-      column.style.display = 'none';
-      return;
-    }
+    section.style.display = 'block';
 
-    column.style.display = 'block';
-
-    // Render active checklist items
     if (active.length > 0) {
-      countEl.textContent = `${active.length} item${active.length !== 1 ? 's' : ''}`;
-      list.innerHTML = active.map(item => renderDeferredItem(item)).join('');
+      const groups = window.TabOutSavedTabs.groupSavedTabsByDomain(active);
+      countEl.textContent = `${active.length} saved · ${groups.length} source${groups.length !== 1 ? 's' : ''}`;
+      list.innerHTML = groups.map(group => renderSavedDomainCard(group)).join('');
       list.style.display = 'block';
       empty.style.display = 'none';
     } else {
@@ -942,7 +940,6 @@ async function renderDeferredColumn() {
       empty.style.display = 'block';
     }
 
-    // Render archive section
     if (archived.length > 0) {
       archiveCountEl.textContent = `(${archived.length})`;
       archiveList.innerHTML = archived.map(item => renderArchiveItem(item)).join('');
@@ -953,38 +950,75 @@ async function renderDeferredColumn() {
 
   } catch (err) {
     console.warn('[tab-out] Could not load saved tabs:', err);
-    column.style.display = 'none';
+    section.style.display = 'none';
   }
 }
 
 /**
- * renderDeferredItem(item)
+ * renderSavedDomainCard(group)
  *
- * Builds HTML for one active checklist item: checkbox, title link,
- * domain, time ago, dismiss button.
+ * Builds one source card for saved tabs from the same domain.
  */
-function renderDeferredItem(item) {
-  let domain = '';
-  try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
+function renderSavedDomainCard(group) {
+  const tabs = group.tabs || [];
+  const count = tabs.length;
+  return `
+    <div class="mission-card saved-domain-card has-active-bar">
+      <div class="status-bar"></div>
+      <div class="mission-content">
+        <div class="mission-top">
+          <span class="mission-name">${escapeHtml(friendlyDomain(group.domain))}</span>
+          <span class="open-tabs-badge saved-tabs-badge">
+            ${ICONS.archive}
+            ${count} saved
+          </span>
+        </div>
+        <div class="mission-pages">${tabs.map(item => renderSavedTabItem(item, group.domain)).join('')}</div>
+      </div>
+    </div>`;
+}
+
+function renderSavedTabItem(item, domain) {
   const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
   const ago = timeAgo(item.savedAt);
+  const title = item.title || item.url;
+  const safeId = escapeAttr(item.id);
+  const safeUrl = escapeAttr(item.url);
+  const safeTitle = escapeAttr(title);
 
   return `
-    <div class="deferred-item" data-deferred-id="${item.id}">
-      <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${item.id}">
+    <div class="page-chip saved-page-chip deferred-item" data-deferred-id="${safeId}">
+      <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${safeId}" title="Done">
+      <img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">
       <div class="deferred-info">
-        <a href="${item.url}" target="_blank" rel="noopener" class="deferred-title" title="${(item.title || '').replace(/"/g, '&quot;')}">
-          <img src="${faviconUrl}" alt="" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" onerror="this.style.display='none'">${item.title || item.url}
+        <a href="${safeUrl}" target="_blank" rel="noopener" class="deferred-title saved-tab-link" title="${safeTitle}">
+          ${escapeHtml(title)}
         </a>
         <div class="deferred-meta">
-          <span>${domain}</span>
+          <span>${escapeHtml(domain)}</span>
           <span>${ago}</span>
         </div>
       </div>
-      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${item.id}" title="Dismiss">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-      </button>
+      <div class="chip-actions">
+        <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${safeId}" title="Remove">
+          ${ICONS.close}
+        </button>
+      </div>
     </div>`;
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
 }
 
 /**
@@ -996,8 +1030,8 @@ function renderArchiveItem(item) {
   const ago = item.completedAt ? timeAgo(item.completedAt) : timeAgo(item.savedAt);
   return `
     <div class="archive-item">
-      <a href="${item.url}" target="_blank" rel="noopener" class="archive-item-title" title="${(item.title || '').replace(/"/g, '&quot;')}">
-        ${item.title || item.url}
+      <a href="${escapeAttr(item.url)}" target="_blank" rel="noopener" class="archive-item-title" title="${escapeAttr(item.title || item.url)}">
+        ${escapeHtml(item.title || item.url)}
       </a>
       <span class="archive-item-date">${ago}</span>
     </div>`;
@@ -1017,7 +1051,7 @@ function renderArchiveItem(item) {
  * 3. Groups tabs by domain (with landing pages pulled out to their own group)
  * 4. Renders domain cards
  * 5. Updates footer stats
- * 6. Renders the "Saved for Later" checklist
+ * 6. Renders saved tabs grouped by source
  */
 async function renderStaticDashboard() {
   // --- Header ---
@@ -1164,8 +1198,8 @@ async function renderStaticDashboard() {
   // --- Check for duplicate Tab Out tabs ---
   checkTabOutDupes();
 
-  // --- Render "Saved for Later" column ---
-  await renderDeferredColumn();
+  // --- Render saved tabs grouped by source ---
+  await renderSavedTabsSection();
 }
 
 async function renderDashboard() {
@@ -1295,8 +1329,8 @@ document.addEventListener('click', async (e) => {
       setTimeout(() => chip.remove(), 200);
     }
 
-    showToast('Saved for later');
-    await renderDeferredColumn();
+    showToast('Saved tab');
+    await renderSavedTabsSection();
     return;
   }
 
@@ -1315,7 +1349,7 @@ document.addEventListener('click', async (e) => {
         item.classList.add('removing');
         setTimeout(() => {
           item.remove();
-          renderDeferredColumn(); // refresh counts and archive
+          renderSavedTabsSection();
         }, 300);
       }, 800);
     }
@@ -1334,7 +1368,7 @@ document.addEventListener('click', async (e) => {
       item.classList.add('removing');
       setTimeout(() => {
         item.remove();
-        renderDeferredColumn();
+        renderSavedTabsSection();
       }, 300);
     }
     return;

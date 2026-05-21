@@ -48,10 +48,9 @@ body::before {
   padding: 48px 32px 80px;
 }
 
-/* When the saved-for-later sidebar is open, expand the container
-   so the tab grid still has room for 2-3 columns */
+/* Saved tabs and open tabs both use the main content width. */
 .container:has(.dashboard-columns) {
-  max-width: 1300px;
+  max-width: 1080px;
 }
 
 /* ---- Header ---- */
@@ -676,7 +675,7 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
 .deferred-list .deferred-item:nth-child(3) { animation-delay: 0.15s; }
 .deferred-list .deferred-item:nth-child(4) { animation-delay: 0.2s; }
 .deferred-list .deferred-item:nth-child(5) { animation-delay: 0.25s; }
-.deferred-column .section-header { animation: fadeUp 0.5s ease 0.1s both; }
+.saved-section .section-header { animation: fadeUp 0.5s ease 0.1s both; }
 
 
 /* ================================================================
@@ -885,41 +884,49 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
 
 
 /* ================================================================
-   SAVED FOR LATER — Checklist Column + Archive
+   SAVED TABS — Grouped Main Area + Done Archive
    ================================================================ */
 
-/* ---- Two-column layout ---- */
 .dashboard-columns {
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
+  display: block;
 }
 
-/* Open tabs column keeps the grid layout */
 .dashboard-columns .active-section {
-  flex: 1;
-  min-width: 600px;
+  width: 100%;
 }
 
-/* Saved for later column — fixed width on the right, scrolls independently */
-.deferred-column {
-  width: 280px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 32px;
-  max-height: calc(100vh - 64px);
-  overflow-y: auto;
+.dashboard-columns .active-section + .active-section {
+  margin-top: 10px;
 }
 
-/* On narrow screens, stack vertically */
-@media (max-width: 800px) {
-  .dashboard-columns {
-    flex-direction: column;
-  }
-  .deferred-column {
-    width: 100%;
-    position: static;
-  }
+.saved-missions {
+  margin-bottom: 24px;
+}
+
+.saved-domain-card::before {
+  background: var(--accent-sage);
+}
+
+.saved-tabs-badge {
+  color: var(--accent-sage);
+  background: rgba(90, 122, 98, 0.08);
+}
+
+.saved-page-chip {
+  cursor: default;
+}
+
+.saved-page-chip:hover {
+  background: rgba(90, 122, 98, 0.04);
+}
+
+.saved-tab-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.saved-tab-link:hover {
+  color: var(--accent-sage);
 }
 
 /* ---- Checklist items ---- */
