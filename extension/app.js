@@ -737,6 +737,33 @@ function getRealTabs() {
   });
 }
 
+async function loadOptionalLocalConfig() {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) return;
+
+  const configUrl = chrome.runtime.getURL('config.local.js');
+  try {
+    const response = await fetch(configUrl, { cache: 'no-store' });
+    if (!response.ok) return;
+  } catch {
+    return;
+  }
+
+  await new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = configUrl;
+    script.onload = resolve;
+    script.onerror = resolve;
+    document.head.appendChild(script);
+  });
+}
+
+document.addEventListener('error', (event) => {
+  const target = event.target;
+  if (target instanceof HTMLImageElement && target.classList.contains('chip-favicon')) {
+    target.style.display = 'none';
+  }
+}, true);
+
 /**
  * checkTabOutDupes()
  *
@@ -774,7 +801,7 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
+      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ''}
       <span class="chip-text">${label}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save tab">
@@ -855,7 +882,7 @@ function renderDomainCard(group) {
     try { domain = new URL(tab.url).hostname; } catch {}
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">` : ''}
+      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ''}
       <span class="chip-text">${label}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save tab">
@@ -989,7 +1016,7 @@ function renderSavedTabItem(item, domain) {
   return `
     <div class="page-chip saved-page-chip deferred-item" data-deferred-id="${safeId}">
       <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${safeId}" title="Done">
-      <img class="chip-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">
+      <img class="chip-favicon" src="${faviconUrl}" alt="">
       <div class="deferred-info">
         <a href="${safeUrl}" target="_blank" rel="noopener" class="deferred-title saved-tab-link" title="${safeTitle}">
           ${escapeHtml(title)}
@@ -1513,4 +1540,4 @@ document.addEventListener('input', async (e) => {
 /* ----------------------------------------------------------------
    INITIALIZE
    ---------------------------------------------------------------- */
-renderDashboard();
+loadOptionalLocalConfig().finally(renderDashboard);
